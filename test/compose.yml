@@ -10,7 +10,6 @@ services:
       - "${RT_DHT_PORT}/udp"
       - "${XMLRPC_PORT}"
       - "${RUTORRENT_PORT}"
-      - "${WEBDAV_PORT}"
       - "${RT_INC_PORT}"
     ports:
       - target: ${RT_DHT_PORT}
@@ -18,9 +17,6 @@ services:
         protocol: udp
       - target: ${RUTORRENT_PORT}
         published: ${RUTORRENT_PORT}
-        protocol: tcp
-      - target: ${WEBDAV_PORT}
-        published: ${WEBDAV_PORT}
         protocol: tcp
       - target: ${RT_INC_PORT}
         published: ${RT_INC_PORT}
