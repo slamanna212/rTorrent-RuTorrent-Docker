@@ -36,7 +36,7 @@ Replace `your-username` with your actual GitHub username.
 
 The GitHub Actions workflow (`.github/workflows/build.yml`) provides:
 
-- **Multi-platform builds**: Supports `linux/amd64`, `linux/arm/v6`, `linux/arm/v7`, and `linux/arm64`
+- **Single-platform builds**: Supports `linux/amd64` only
 - **Automated publishing**: Pushes to GitHub Container Registry
 - **Build caching**: Uses GitHub Actions cache for faster builds
 - **Security scanning**: Trivy vulnerability scanning
@@ -46,12 +46,12 @@ The GitHub Actions workflow (`.github/workflows/build.yml`) provides:
 ### Workflow Jobs
 
 #### 1. Build Job
-- Builds images for each platform in parallel
-- Uploads build artifacts (digests) for multi-platform manifest creation
-- Uses build matrix for efficient parallel processing
+- Builds image for AMD64 platform
+- Uploads build artifacts (digests) for manifest creation
+- Uses build matrix for consistent processing
 
 #### 2. Merge Job
-- Creates multi-platform manifests
+- Creates final manifest
 - Pushes final images to GitHub Container Registry
 - Runs only on non-PR events
 
@@ -102,7 +102,7 @@ The workflow creates these image tags:
 # Build for specific platform
 ./build.sh --platform linux/arm64
 
-# Build multi-platform (requires push)
+# Build for registry (requires push)
 ./build.sh --type multi-platform --push
 ```
 
@@ -121,13 +121,13 @@ Options:
 
 Build Types:
   local                   Build for local platform only (default)
-  multi-platform          Build for all supported platforms
-  all                     Build and export to docker for all platforms
+  multi-platform          Build for supported platform (AMD64)
+  all                     Build and export to docker for supported platform
 
 Examples:
   ./build.sh                      # Build for local platform
-  ./build.sh --type multi-platform --push  # Build multi-platform and push
-  ./build.sh --platform linux/arm64        # Build for ARM64 only
+  ./build.sh --type multi-platform --push  # Build and push to registry
+  ./build.sh --platform linux/amd64        # Build for AMD64 explicitly
   ./build.sh --tag my-rtorrent:v1.0        # Build with custom tag
 ```
 
@@ -151,14 +151,14 @@ docker buildx bake
 # Build specific target
 docker buildx bake image-local
 
-# Build multi-platform
+# Build for supported platform
 docker buildx bake image-all
 
 # Build with cache disabled
 docker buildx bake --no-cache
 
 # Build for specific platform
-docker buildx bake --set *.platform=linux/arm64
+docker buildx bake --set *.platform=linux/amd64
 ```
 
 ### Docker Bake Targets
@@ -167,23 +167,19 @@ The `docker-bake.hcl` file defines these targets:
 
 - `image-local`: Build for local platform and load to Docker
 - `image`: Base image target
-- `image-all`: Multi-platform build for all supported architectures
+- `image-all`: Build for supported architecture (AMD64)
 
 ## Build Environment
 
 ### System Requirements
 
 - Docker 20.10+ with Buildx support
-- Multi-platform builds require QEMU emulation
 - At least 4GB RAM recommended for builds
 - Fast internet connection for downloading base images
 
 ### Supported Platforms
 
 - `linux/amd64` - x86_64 Linux
-- `linux/arm/v6` - ARM v6 (Raspberry Pi 1)
-- `linux/arm/v7` - ARM v7 (Raspberry Pi 2/3)
-- `linux/arm64` - ARM 64-bit (Raspberry Pi 4, Apple Silicon)
 
 ## Build Performance
 
@@ -200,7 +196,7 @@ Approximate build times (varies by system):
 
 - **Local build (cached)**: 5-10 minutes
 - **Local build (no cache)**: 30-45 minutes
-- **Multi-platform build**: 1-2 hours
+- **Registry build**: 30-45 minutes
 
 ## Troubleshooting
 
@@ -210,12 +206,6 @@ Approximate build times (varies by system):
 ```bash
 # Install buildx plugin
 docker buildx install
-```
-
-#### Platform Not Supported
-```bash
-# Register QEMU emulators
-docker run --privileged --rm tonistiigi/binfmt --install all
 ```
 
 #### Build Cache Issues
@@ -353,9 +343,10 @@ When modifying the build system:
 
 ### Adding New Platforms
 
-To add support for new platforms:
+To add support for additional platforms:
 
 1. **Update `docker-bake.hcl`**: Add platform to `image-all` target
 2. **Update workflow**: Add platform to build matrix
 3. **Test thoroughly**: Ensure platform compatibility
-4. **Update documentation**: Add platform to supported list 
+4. **Update documentation**: Add platform to supported list
+5. **Consider QEMU**: Non-native platforms may require emulation setup 
