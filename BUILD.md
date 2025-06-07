@@ -10,6 +10,26 @@ The project provides multiple ways to build the Docker container:
 2. **Local Build Script** - Interactive development builds
 3. **Direct Docker Bake** - Manual build commands
 
+## 📦 Container Registry
+
+Built images are published to GitHub Container Registry. After the workflow runs, you can pull and use the images:
+
+```bash
+# Pull the latest image
+docker pull ghcr.io/your-username/rtorrent-rutorrent:latest
+
+# Run the published image
+docker run -d --name rtorrent-rutorrent \
+  -e PUID=1000 -e PGID=1000 \
+  -v ./data:/data \
+  -v ./downloads:/downloads \
+  -v ./passwd:/passwd \
+  -p 8080:8080 -p 8000:8000 \
+  ghcr.io/your-username/rtorrent-rutorrent:latest
+```
+
+Replace `your-username` with your actual GitHub username.
+
 ## GitHub Actions Workflow
 
 ### Workflow Features
@@ -17,7 +37,7 @@ The project provides multiple ways to build the Docker container:
 The GitHub Actions workflow (`.github/workflows/build.yml`) provides:
 
 - **Multi-platform builds**: Supports `linux/amd64`, `linux/arm/v6`, `linux/arm/v7`, and `linux/arm64`
-- **Automated publishing**: Pushes to Docker Hub and GitHub Container Registry
+- **Automated publishing**: Pushes to GitHub Container Registry
 - **Build caching**: Uses GitHub Actions cache for faster builds
 - **Security scanning**: Trivy vulnerability scanning
 - **Container testing**: Basic functionality tests
@@ -32,7 +52,7 @@ The GitHub Actions workflow (`.github/workflows/build.yml`) provides:
 
 #### 2. Merge Job
 - Creates multi-platform manifests
-- Pushes final images to registries
+- Pushes final images to GitHub Container Registry
 - Runs only on non-PR events
 
 #### 3. Test Job
@@ -47,14 +67,7 @@ The GitHub Actions workflow (`.github/workflows/build.yml`) provides:
 
 ### Required Secrets
 
-To use the GitHub Actions workflow, configure these repository secrets:
-
-```
-DOCKERHUB_USERNAME    # Your Docker Hub username
-DOCKERHUB_TOKEN       # Docker Hub access token
-```
-
-The `GITHUB_TOKEN` is automatically provided by GitHub Actions.
+The GitHub Actions workflow only requires the automatically provided `GITHUB_TOKEN` secret for pushing to GitHub Container Registry. No additional secrets need to be configured.
 
 ### Triggering Builds
 
@@ -317,14 +330,14 @@ Recommended branch protection rules:
 1. **Create release tag**: `git tag v1.2.3`
 2. **Push tag**: `git push origin v1.2.3`
 3. **GitHub Actions builds and publishes automatically**
-4. **Images available on Docker Hub and GHCR**
+4. **Images available on GitHub Container Registry**
 
 ### Monitoring
 
 Monitor build status:
 
 - GitHub Actions tab for build logs
-- Docker Hub for image statistics
+- GitHub Container Registry for image statistics
 - GitHub Security tab for vulnerability reports
 
 ## Contributing
