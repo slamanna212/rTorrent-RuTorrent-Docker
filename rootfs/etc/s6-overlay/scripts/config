@@ -212,7 +212,7 @@ chown rtorrent:rtorrent /data/rtorrent/.rtorrent.rc
 # which this image does not do. A .rtorrent.rc carried over from an older image
 # keeps those lines, they are silently ignored, and settings such as the
 # incoming port range stop applying. Warn instead of overwriting user config.
-if grep -qE '^[[:space:]]*(port_range|port_random|schedule2|schedule_remove2|execute2|encoding\.add|network\.port_range|network\.port_random)[[:space:]]*=' /data/rtorrent/.rtorrent.rc 2>/dev/null; then
+if grep -qE '^[[:space:]]*(port_range|port_random|schedule2|schedule_remove2|execute2|encoding\.add|network\.port_range|network\.port_random|dht\.port)(\.(set|get))?[[:space:]]*=' /data/rtorrent/.rtorrent.rc 2>/dev/null; then
   echo "WARNING: /data/rtorrent/.rtorrent.rc uses rTorrent commands removed in 0.16." >&2
   echo "         Those lines are IGNORED (no -D). See MIGRATION.md before starting torrents." >&2
 fi
