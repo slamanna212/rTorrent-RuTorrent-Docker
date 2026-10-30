@@ -21,6 +21,17 @@ XMLRPC_AUTHBASIC_STRING=${XMLRPC_AUTHBASIC_STRING:-rTorrent XMLRPC restricted ac
 RUTORRENT_AUTHBASIC_STRING=${RUTORRENT_AUTHBASIC_STRING:-ruTorrent restricted access}
 
 RT_LOG_LEVEL=${RT_LOG_LEVEL:-info}
+
+# rTorrent 0.16.26 replaced the log levels (critical/error/warn/notice/info/debug)
+# with log groups (errors, events, debug_trace, connection_*, dht_*, ...). Passing
+# an old level name makes rTorrent reject the whole .rtlocal.rc and exit, so map
+# the historical values and let anything else through unchanged.
+case "${RT_LOG_LEVEL}" in
+  critical|error|warn|notice) RT_LOG_CATEGORY="errors" ;;
+  info)                       RT_LOG_CATEGORY="events" ;;
+  debug)                      RT_LOG_CATEGORY="debug_trace" ;;
+  *)                          RT_LOG_CATEGORY="${RT_LOG_LEVEL}" ;;
+esac
 RT_LOG_EXECUTE=${RT_LOG_EXECUTE:-false}
 RT_LOG_XMLRPC=${RT_LOG_XMLRPC:-false}
 RT_SESSION_SAVE_SECONDS=${RT_SESSION_SAVE_SECONDS:-3600}
@@ -166,7 +177,7 @@ fi
 
 # rTorrent local config
 echo "Checking rTorrent local configuration..."
-sed -e "s!@RT_LOG_LEVEL@!$RT_LOG_LEVEL!g" \
+sed -e "s!@RT_LOG_CATEGORY@!$RT_LOG_CATEGORY!g" \
   -e "s!@RT_DHT_PORT@!$RT_DHT_PORT!g" \
   -e "s!@RT_INC_PORT@!$RT_INC_PORT!g" \
   -e "s!@XMLRPC_SIZE_LIMIT@!$XMLRPC_SIZE_LIMIT!g" \

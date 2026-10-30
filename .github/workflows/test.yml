@@ -60,6 +60,35 @@ jobs:
           log_check: "ready to handle connections"
           timeout: 120
       -
+        # "ready to handle connections" comes from PHP-FPM, so it says nothing
+        # about rTorrent. Assert the process is actually alive and its config
+        # parsed, otherwise a rejected .rtlocal.rc/.rtorrent.rc passes CI.
+        name: Check rTorrent config parsed
+        run: |
+          set -euo pipefail
+          if docker logs ${{ env.CONTAINER_NAME }} 2>&1 | grep -qE 'input_error|invalid option name|Failed to parse'; then
+            echo "::error::rTorrent rejected its configuration"
+            docker logs ${{ env.CONTAINER_NAME }}
+            exit 1
+          fi
+          docker exec ${{ env.CONTAINER_NAME }} pgrep -f 'rtorrent -o import' >/dev/null \
+            || { echo "::error::rtorrent process is not running"; docker logs ${{ env.CONTAINER_NAME }}; exit 1; }
+      -
+        name: Wait for healthcheck
+        run: |
+          set -euo pipefail
+          for i in $(seq 1 24); do
+            state="$(docker inspect -f '{{.State.Health.Status}}' ${{ env.CONTAINER_NAME }} 2>/dev/null || echo starting)"
+            if [ "$state" = "healthy" ]; then
+              echo "healthy after ~$((i * 5))s"
+              exit 0
+            fi
+            sleep 5
+          done
+          docker logs ${{ env.CONTAINER_NAME }}
+          echo "::error::container never reported healthy (last state: ${state})"
+          exit 1
+      -
         name: Check ruTorrent environment
         run: |
           docker exec ${{ env.CONTAINER_NAME }} rutorrent-env-check

@@ -51,6 +51,28 @@ protocol.encryption.set = handshake_<policy>, stream_<policy>
 
 `trackers.use_udp.set` and `network.port_open` still parse but do nothing — delete them.
 
+## Log levels became log groups
+
+`log.add_output` used to take a level (`critical`, `error`, `warn`, `notice`,
+`info`, `debug`). rTorrent 0.16.26 replaced those with **log groups**:
+`errors`, `events`, `debug_trace`, plus `connection_*`, `dht_*`, `net_*`,
+`peer_*`, `protocol_*`, `rpc_events`, `session_events`, `storage_*`.
+
+An old level name is now an **invalid option**, which makes rTorrent reject the
+entire `.rtlocal.rc` and exit — the container comes up with PHP-FPM serving
+ruTorrent and no rTorrent behind it. The init script maps the old values so
+`RT_LOG_LEVEL` keeps working:
+
+| `RT_LOG_LEVEL` | log group |
+|---|---|
+| `critical`, `error`, `warn`, `notice` | `errors` |
+| `info` | `events` |
+| `debug` | `debug_trace` |
+| anything else | passed through unchanged |
+
+You can set a group name directly, e.g. `RT_LOG_LEVEL=errors,rpc_events`.
+
+
 ## Why not just run with `-D`?
 
 `-D` re-enables the deprecated aliases. It keeps an old config working, but
