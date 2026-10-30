@@ -2,7 +2,7 @@ name: rtorrent-rutorrent
 
 services:
   rtorrent-rutorrent:
-    image: ${RTORRENT_RUTORRENT_IMAGE:-crazymax/rtorrent-rutorrent}
+    image: ${RTORRENT_RUTORRENT_IMAGE:-ghcr.io/slamanna212/rtorrent-rutorrent}
     container_name: ${RTORRENT_RUTORRENT_CONTAINER:-rtorrent-rutorrent}
     networks:
       - rtorrent-rutorrent
@@ -33,17 +33,6 @@ services:
       nofile:
         soft: 32000
         hard: 40000
-    restart: always
-
-  rtorrent-logs:
-    image: bash
-    container_name: rtorrent-rutorrent-logs
-    command: bash -c 'tail -f /data/rtorrent/log/*.log'
-    network_mode: none
-    depends_on:
-      - rtorrent-rutorrent
-    volumes:
-      - "rtorrent-rutorrent-data:/data"
     restart: always
 
 volumes:

@@ -1,31 +1,25 @@
 # syntax=docker/dockerfile:1
 
-ARG LIBSIG_VERSION=3.0.3
-ARG CARES_VERSION=1.34.5
-ARG CURL_VERSION=8.12.1
+ARG CARES_VERSION=1.34.9
+ARG CURL_VERSION=8.23.0
+
+# rTorrent 0.16.x requires C++20 and renames the port/socket/encryption commands;
+# see rootfs/tpls/.rtorrent.rc for the matching config.
+ARG LIBTORRENT_VERSION=v0.16.27
+ARG RTORRENT_VERSION=v0.16.27
+
 ARG MKTORRENT_VERSION=v1.1
-ARG GEOIP2_PHPEXT_VERSION=1.3.1
 
-# v5.2.8
-ARG RUTORRENT_VERSION=b9b5872fb17169f3ddb76529b174a2a267a13774
-ARG GEOIP2_RUTORRENT_VERSION=4ff2bde530bb8eef13af84e4413cedea97eda148
-ARG DUMP_TORRENT_VERSION=302ac444a20442edb4aeabef65b264a85ab88ce9
+ARG RUTORRENT_VERSION=v5.3.19
+ARG DUMPTORRENT_VERSION=v1.7.0
 
-# libtorrent v0.15.3
-ARG LIBTORRENT_VERSION=0cb559ea23fa67ded8aea69c93cba50ae0ab243f
-# rtorrent v0.15.3
-ARG RTORRENT_VERSION=6f8c1246dc013d1d5c39ecd66373346ac42fe746
+ARG ALPINE_VERSION=3.24
 
-ARG ALPINE_VERSION=3.21
-ARG ALPINE_S6_VERSION=${ALPINE_VERSION}-2.2.0.3
+FROM tianon/gosu:latest AS gosu
 
 FROM --platform=${BUILDPLATFORM} alpine:${ALPINE_VERSION} AS src
 RUN apk --update --no-cache add curl git tar tree sed xz
 WORKDIR /src
-
-FROM src AS src-libsig
-ARG LIBSIG_VERSION
-RUN curl -sSL "https://download.gnome.org/sources/libsigc%2B%2B/3.0/libsigc%2B%2B-${LIBSIG_VERSION}.tar.xz" | tar xJv --strip 1
 
 FROM src AS src-cares
 ARG CARES_VERSION
@@ -50,35 +44,43 @@ RUN git init . && git remote add origin "https://github.com/pobrn/mktorrent.git"
 ARG MKTORRENT_VERSION
 RUN git fetch origin "${MKTORRENT_VERSION}" && git checkout -q FETCH_HEAD
 
-FROM src AS src-geoip2-phpext
-RUN git init . && git remote add origin "https://github.com/rlerdorf/geoip.git"
-ARG GEOIP2_PHPEXT_VERSION
-RUN git fetch origin "${GEOIP2_PHPEXT_VERSION}" && git checkout -q FETCH_HEAD
-
 FROM src AS src-rutorrent
 RUN git init . && git remote add origin "https://github.com/Novik/ruTorrent.git"
 ARG RUTORRENT_VERSION
 RUN git fetch origin "${RUTORRENT_VERSION}" && git checkout -q FETCH_HEAD
-RUN rm -rf .git* conf/users plugins/geoip share
+RUN rm -rf .git* conf/users plugins/geoip share tests
+
+FROM composer:2 AS update-geoip2-rutorrent
+WORKDIR /app
+COPY geoip2-rutorrent/composer.json ./
+RUN composer update --no-dev --no-interaction --no-progress --prefer-dist --classmap-authoritative
+
+FROM scratch AS export-geoip2-rutorrent
+COPY --from=update-geoip2-rutorrent /app/composer.json /composer.json
+COPY --from=update-geoip2-rutorrent /app/composer.lock /composer.lock
+COPY --from=update-geoip2-rutorrent /app/vendor /vendor
+
+FROM composer:2 AS vendor-geoip2-rutorrent
+WORKDIR /app
+COPY geoip2-rutorrent/composer.json geoip2-rutorrent/composer.lock ./
+RUN composer install --no-dev --no-interaction --no-progress --prefer-dist --classmap-authoritative
 
 FROM src AS src-geoip2-rutorrent
-RUN git init . && git remote add origin "https://github.com/Micdu70/geoip2-rutorrent.git"
-ARG GEOIP2_RUTORRENT_VERSION
-RUN git fetch origin "${GEOIP2_RUTORRENT_VERSION}" && git checkout -q FETCH_HEAD
-RUN rm -rf .git*
+COPY geoip2-rutorrent /src
+COPY --from=vendor-geoip2-rutorrent /app/vendor /src/vendor
 
 FROM src AS src-mmdb
 RUN curl -SsOL "https://github.com/crazy-max/geoip-updater/raw/mmdb/GeoLite2-City.mmdb" \
   && curl -SsOL "https://github.com/crazy-max/geoip-updater/raw/mmdb/GeoLite2-Country.mmdb"
 
-FROM src AS src-dump-torrent
-RUN git init . && git remote add origin "https://github.com/TheGoblinHero/dumptorrent.git"
-ARG DUMP_TORRENT_VERSION
-RUN git fetch origin "${DUMP_TORRENT_VERSION}" && git checkout -q FETCH_HEAD
-RUN sed -i '1i #include <sys/time.h>' scrapec.c
+FROM src AS src-dumptorrent
+RUN git init . && git remote add origin "https://github.com/tomcdj71/dumptorrent.git"
+ARG DUMPTORRENT_VERSION
+RUN git fetch origin "${DUMPTORRENT_VERSION}" && git checkout -q FETCH_HEAD
+RUN sed -i '1i #include <sys/time.h>' src/scrapec.c
 RUN rm -rf .git*
 
-FROM crazymax/alpine-s6:${ALPINE_S6_VERSION} AS builder
+FROM alpine:${ALPINE_VERSION} AS builder
 RUN apk --update --no-cache add \
     autoconf \
     automake \
@@ -88,32 +90,23 @@ RUN apk --update --no-cache add \
     cppunit-dev \
     cmake \
     gd-dev \
-    geoip-dev \
     libpsl-dev \
+    libsigc++3-dev \
     libtool \
     libxslt-dev \
     linux-headers \
     ncurses-dev \
     nghttp2-dev \
     openssl-dev \
-    patch \
     pcre-dev \
-    php83-dev \
-    php83-pear \
+    php85-dev \
+    php85-pear \
     tar \
     tree \
     xz \
     zlib-dev
 
 ENV DIST_PATH="/dist"
-
-WORKDIR /usr/local/src/libsig
-COPY --from=src-libsig /src .
-RUN ./configure
-RUN make -j$(nproc)
-RUN make install -j$(nproc)
-RUN make DESTDIR=${DIST_PATH} install -j$(nproc)
-RUN tree ${DIST_PATH}
 
 WORKDIR /usr/local/src/cares
 COPY --from=src-cares /src .
@@ -133,8 +126,6 @@ RUN tree ${DIST_PATH}
 
 WORKDIR /usr/local/src/libtorrent
 COPY --from=src-libtorrent /src .
-COPY /patches/libtorrent .
-RUN patch -p1 < libtorrent-0.15.3-resume-fix.patch
 RUN autoreconf -vfi
 RUN ./configure --enable-aligned
 RUN make -j$(nproc) CXXFLAGS="-w -O3 -flto -Werror=odr -Werror=lto-type-mismatch -Werror=strict-aliasing"
@@ -162,34 +153,23 @@ RUN make install -j$(nproc)
 RUN make DESTDIR=${DIST_PATH} install -j$(nproc)
 RUN tree ${DIST_PATH}
 
-WORKDIR /usr/local/src/geoip2-phpext
-COPY --from=src-geoip2-phpext /src .
-RUN <<EOT
-  set -e
-  phpize83
-  ./configure
-  make
-  make install
-EOT
-RUN mkdir -p ${DIST_PATH}/usr/lib/php83/modules
-RUN cp -f /usr/lib/php83/modules/geoip.so ${DIST_PATH}/usr/lib/php83/modules/
+WORKDIR /usr/local/src/dumptorrent
+COPY --from=src-dumptorrent /src .
+RUN cmake -B build/ -DCMAKE_CXX_COMPILER=g++ -DCMAKE_C_COMPILER=gcc -DCMAKE_BUILD_TYPE=Release -S .
+RUN cmake --build build/ --config Release --parallel $(nproc)
+RUN cp build/dumptorrent build/scrapec ${DIST_PATH}/usr/local/bin
 RUN tree ${DIST_PATH}
 
-WORKDIR /usr/local/src/dump-torrent
-COPY --from=src-dump-torrent /src .
-RUN make dumptorrent -j$(nproc)
-RUN cp dumptorrent ${DIST_PATH}/usr/local/bin
-RUN tree ${DIST_PATH}
-
-FROM crazymax/alpine-s6:${ALPINE_S6_VERSION}
+FROM alpine:${ALPINE_VERSION}
+COPY --from=gosu /gosu /usr/local/bin/
 COPY --from=builder /dist /
 COPY --from=src-rutorrent --chown=nobody:nogroup /src /var/www/rutorrent
 COPY --from=src-geoip2-rutorrent --chown=nobody:nogroup /src /var/www/rutorrent/plugins/geoip2
 COPY --from=src-mmdb /src /var/mmdb
 
-ENV PYTHONPATH="$PYTHONPATH:/var/www/rutorrent" \
+ENV PYTHONPATH="/var/www/rutorrent" \
   S6_BEHAVIOUR_IF_STAGE2_FAILS="2" \
-  S6_KILL_GRACETIME="10000" \
+  S6_STAGE2_HOOK="/etc/s6-overlay/scripts/runtime-bundles" \
   TZ="UTC" \
   PUID="1000" \
   PGID="1000"
@@ -199,11 +179,10 @@ RUN echo "net.core.rmem_max = 67108864" >> /etc/sysctl.conf \
   && echo "net.core.wmem_max = 67108864" >> /etc/sysctl.conf \
   && sysctl -p
 
-# unrar package is not available since alpine 3.15
-# dhclient package is not available since alpine 3.21
+# ruTorrent's unpack plugin requires unrar, which Alpine removed in 3.15.
+# Use the last Alpine release that packaged it until a replacement is available.
 RUN echo "@314 http://dl-cdn.alpinelinux.org/alpine/v3.14/main" >> /etc/apk/repositories \
-  && echo "@320 http://dl-cdn.alpinelinux.org/alpine/v3.20/main" >> /etc/apk/repositories \
-  && apk --update --no-cache add unrar@314 dhclient@320
+  && apk --update --no-cache add unrar@314
 
 RUN apk --update --no-cache add \
     apache2-utils \
@@ -215,9 +194,9 @@ RUN apk --update --no-cache add \
     coreutils \
     ffmpeg \
     findutils \
-    geoip \
     grep \
     gzip \
+    libsigc++3 \
     libstdc++ \
     mediainfo \
     ncurses \
@@ -225,23 +204,24 @@ RUN apk --update --no-cache add \
     nginx-mod-http-dav-ext \
     nginx-mod-http-geoip2 \
     openssl \
-    php83 \
-    php83-bcmath \
-    php83-ctype \
-    php83-curl \
-    php83-dom \
-    php83-fileinfo \
-    php83-fpm \
-    php83-mbstring \
-    php83-openssl \
-    php83-phar \
-    php83-posix \
-    php83-session \
-    php83-sockets \
-    php83-xml \
-    php83-zip \
+    php85 \
+    php85-bcmath \
+    php85-ctype \
+    php85-curl \
+    php85-dom \
+    php85-fileinfo \
+    php85-fpm \
+    php85-mbstring \
+    php85-openssl \
+    php85-posix \
+    php85-session \
+    php85-simplexml \
+    php85-sockets \
+    php85-xml \
+    php85-zip \
     python3 \
     py3-pip \
+    s6-overlay \
     shadow \
     sox \
     tar \
