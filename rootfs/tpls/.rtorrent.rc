@@ -30,6 +30,10 @@ pieces.hash.on_completion.set = no
 # This may also be set using ulimit -m where 3/4 will be allocated to file chunks
 #pieces.memory.max.set = 1GB
 
+# XMLRPC response size limit. Overrides XMLRPC_SIZE_LIMIT from .rtlocal.rc,
+# because this file is parsed after it. Large torrent lists need the headroom.
+network.xmlrpc.size_limit.set = 4M
+
 # Listening port for incoming peer traffic.
 # A random port is picked from the range on every start, so the NAT forward has to
 # cover the whole range. rTorrent 0.16 renamed network.port_range/network.port_random
