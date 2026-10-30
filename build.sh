@@ -40,7 +40,7 @@ usage() {
     echo -e "${YELLOW}Examples:${NC}"
     echo "  $0                      # Build for local platform"
     echo "  $0 --type multi-platform --push  # Build multi-platform and push"
-    echo "  $0 --platform linux/arm64        # Build for ARM64 only"
+    echo "  $0 --platform linux/amd64        # Build for AMD64 explicitly"
     echo "  $0 --tag my-rtorrent:v1.0        # Build with custom tag"
 }
 

@@ -100,7 +100,7 @@ The workflow creates these image tags:
 ./build.sh --tag my-rtorrent:dev
 
 # Build for specific platform
-./build.sh --platform linux/arm64
+./build.sh --platform linux/amd64
 
 # Build for registry (requires push)
 ./build.sh --type multi-platform --push
@@ -134,7 +134,7 @@ Examples:
 ### Build Script Features
 
 - **Prerequisites checking**: Validates Docker and Buildx availability
-- **Buildx setup**: Automatically configures multi-platform builder
+- **Buildx setup**: Automatically configures the Buildx builder
 - **Build caching**: Intelligent cache management
 - **Container testing**: Runs basic functionality tests
 - **Colored output**: Easy-to-read status messages

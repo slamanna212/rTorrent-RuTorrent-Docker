@@ -21,9 +21,16 @@ target "image-local" {
   output = ["type=docker"]
 }
 
+// amd64 only: the build stages compile rTorrent/libtorrent from source, and the
+// arm targets were dropped to keep build time and CI cost down.
 target "image-all" {
   inherits = ["image"]
   platforms = [
     "linux/amd64"
   ]
+}
+
+target "geoip2-rutorrent-vendor" {
+  target = "export-geoip2-rutorrent"
+  output = ["type=local,dest=geoip2-rutorrent"]
 }
